@@ -1,0 +1,24 @@
+# Configure models here 
+
+providers:
+  nvidia_nim:
+    base_url_env: NVIDIA_NIM_BASE_URL
+    api_key_env: NVIDIA_NIM_API_KEY
+  google_ai_studio:
+    base_url_env: GOOGLE_AI_STUDIO_BASE_URL
+    api_key_env: GOOGLE_AI_STUDIO_API_KEY
+  openrouter:
+    base_url_env: OPENROUTER_BASE_URL
+    api_key_env: OPENROUTER_API_KEY
+
+tasks:
+  fact_extraction:
+    primary:  { provider: nvidia_nim,  model: meta/llama-3.1-70b-instruct }
+    fallback: { provider: openrouter,  model: google/gemma-4-31b-it:free }
+
+  question_phrasing:
+    primary:  { provider: openrouter,  model: google/gemma-3-12b-it }
+
+  explanation_generation:
+    primary:  { provider: google_ai_studio, model: gemini-3.5-flash }
+    fallback: { provider: openrouter,       model: anthropic/claude-3.5-sonnet }
