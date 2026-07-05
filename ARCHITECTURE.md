@@ -79,8 +79,7 @@ The Red-Flag Detector (`safety/red_flag_detector.py`) sits between Fact Extracti
 ## Interfaces
 
 - **CLI** (`cli/chat.py`): calls `process_turn()` directly (in-process) for fast manual testing.
-- **Gradio UI** (`ui/gradio_app.py`): mounted inside FastAPI at `/ui`. Two tabs: Patient Chat and Clinician View (real `PatientCase` state).
-- **FastAPI** (`api/main.py`): serves REST API + Gradio UI from one process.
+- **FastAPI** (`api/main.py`): serves REST API.
 
 ## Data flow
 

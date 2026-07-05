@@ -69,13 +69,42 @@ MEDICATION_DISCLAIMER = (
     "but I can help determine the right level of care for these symptoms."
 )
 
+OUT_OF_SCOPE_PATTERNS = [
+    "diet plan", "meal plan", "nutrition plan",
+    "suggest me a", "recommend me a",
+    "do i have", "is this", "am i having",  # diagnosis-seeking
+    "refill", "prescription renewal", "renew my prescription",
+    "management plan", "treatment plan", "care plan",
+    "what supplement", "which supplement",
+]
+
 
 def _mentions_medication(text: str) -> bool:
     lower = text.lower()
     return any(kw in lower for kw in MEDICATION_KEYWORDS)
 
 
+def _is_out_of_scope(text: str) -> bool:
+    lower = text.lower()
+    return any(kw in lower for kw in OUT_OF_SCOPE_PATTERNS)
+
+
+def out_of_scope_response_template():
+    return ControllerResponse(
+        message=(
+            "I'm not able to help with medication or treatment planning questions like this — "
+            "that's something to bring to your doctor or pharmacist. If you're also dealing with "
+            "a symptom right now, tell me about it and I can help figure out how urgent it is."
+        ),
+        status=CaseStatus.GATHERING.value,
+    )
+
+
 async def process_turn(conversation_id: str, message: str) -> ControllerResponse:
+    # Out-of-scope check: fast, before any extraction or triage logic
+    if _is_out_of_scope(message):
+        return out_of_scope_response_template()
+
     case = PatientCase.load(conversation_id) or PatientCase.new(conversation_id)
 
     old_category = case.facts.symptom_category

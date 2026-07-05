@@ -53,6 +53,7 @@ def test_generate_explanation_falls_back_when_not_grounded(monkeypatch):
         facts = ExtractedFacts(symptom_category="chest_pain", severity="mild", raw_text="chest pain")
         protocol = Protocol(protocol_id="p", symptom_category="chest_pain", required_fields=[], safety_netting="Seek care if worsening")
         result = await generate_explanation(type("Result", (), {"disposition": "PRIMARY_CARE"})(), facts, protocol)
-        assert "PRIMARY_CARE" in result
+        assert "primary care provider" in result.lower()
+        assert "Seek care if worsening" in result
 
     asyncio.run(run_test())

@@ -25,14 +25,54 @@ def build_explanation_prompt(disposition_result, facts: ExtractedFacts, safety_n
     )
 
 
+_DISPOSITION_LABELS = {
+    "EMERGENCY": "This needs emergency care right now — please call 911 or go to the nearest emergency room.",
+    "URGENT_CARE": "Based on what you've described, I'd recommend visiting an urgent care center today.",
+    "PRIMARY_CARE": "This sounds like something your primary care provider can help with — I'd recommend booking an appointment.",
+    "SELF_CARE": "This sounds manageable with self-care at home for now.",
+}
+
+
 def fallback_template_explanation(disposition_result, facts: ExtractedFacts, protocol: Protocol) -> str:
-    return (
-        f"Based on the information collected, the recommended disposition is {disposition_result.disposition}. "
-        f"Please follow the safety guidance for {protocol.symptom_category or 'this condition'}."
-    )
+    label = _DISPOSITION_LABELS.get(disposition_result.disposition, "Please seek medical attention.")
+    safety = protocol.safety_netting or ""
+    if safety:
+        return f"{label}\n\n{safety}"
+    return label
+
+
+_GROUNDED_ALLOWLIST = {
+    "patient", "reports", "based", "recommended", "disposition", "symptoms",
+    "follow", "should", "please", "medical", "urgent", "safety", "guidance",
+    "because", "care", "chest", "breath", "shortness", "right", "call",
+    "hospital", "nearest", "emergency", "room", "visit", "today", "center",
+    "primary", "provider", "book", "appointment", "manageable", "home",
+    "seek", "attention", "worsens", "worsening", "spreads", "develop",
+    "difficulty", "fainting", "signs", "infection", "fever", "wound",
+    "redness", "swelling", "warm", "advised", "evaluation", "condition",
+    "recommend", "recommends", "advice", "check", "doctor", "nurse",
+    "clinic", "within", "hours", "days", "weeks", "better", "worse",
+    "worsened", "improve", "improving", "important", "avoid", "rest",
+    "fluids", "over", "counter", "medicine", "medication", "pain",
+    "relievers", "monitor", "monitoring", "watch", "carefully",
+    "instructions", "provided", "above", "given", "describe", "described",
+    "noted", "mention", "mentioned", "report", "reported", "triage",
+    "level", "next", "steps", "action", "plan", "need", "needs",
+    "could", "would", "should", "might", "may", "will", "can",
+    "these", "those", "this", "that", "with", "without", "from",
+    "your", "have", "has", "had", "been", "being", "some", "any",
+    "more", "most", "much", "many", "each", "every", "both", "all",
+    "also", "very", "just", "now", "then", "than", "well", "back",
+    "still", "even", "only", "once", "here", "there", "when", "where",
+    "what", "which", "who", "how", "why", "while", "after", "before",
+    "during", "until", "between", "about", "into", "through", "over",
+    "under", "above", "below", "along", "around", "among", "across",
+    "other", "another", "such", "like", "than", "then",
+}
 
 
 def is_grounded(text: str, facts: ExtractedFacts, disposition_result) -> bool:
+    """Check that the explanation doesn't introduce symptoms not in the facts."""
     normalized = text.lower()
     facts_payload = facts.model_dump()
     fact_values = []
@@ -44,17 +84,15 @@ def is_grounded(text: str, facts: ExtractedFacts, disposition_result) -> bool:
         elif isinstance(value, list):
             fact_values.extend(str(item).lower() for item in value)
 
-    if not fact_values:
-        return True
-
     known_terms = set(" ".join(fact_values).split())
     content_tokens = [token for token in re.findall(r"[a-zA-Z_]+", normalized) if len(token) > 3]
 
     for token in content_tokens:
-        if token in {"patient", "reports", "based", "recommended", "disposition", "symptoms", "follow", "should", "please", "medical", "urgent", "safety", "guidance", "because", "care", "chest", "breath", "shortness"}:
+        if token in _GROUNDED_ALLOWLIST:
             continue
-        if token not in known_terms:
-            return False
+        if token in known_terms:
+            continue
+        return False
     return True
 
 

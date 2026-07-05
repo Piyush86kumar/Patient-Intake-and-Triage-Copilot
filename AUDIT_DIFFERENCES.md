@@ -157,9 +157,6 @@ But as noted in Step 10, **neither is actually called by the controller** — th
 | `POST /conversations/{id}/messages` exists | **DONE** | `api/main.py:53` |
 | `GET /conversations/{id}/state` exists | **DONE** | `api/main.py:64` |
 | CLI calls `process_turn()` directly (in-process) | **DONE** | `cli/chat.py:30` — calls `process_turn()` directly, no HTTP |
-| Gradio calls `process_turn()` directly (in-process) | **DONE** | `ui/gradio_app.py:9` — calls `process_turn()` directly |
-| Gradio "Clinician View" tab renders real state | **DONE** | Calls `PatientCase.load()` and displays `model_dump()` |
-| Gradio mounted inside FastAPI | **NOT DONE** | Gradio is standalone (`__main__` launch), NOT mounted via `gr.mount_gradio_app()` |
 | `api/schemas.py` as separate file | **MISSING** | Schemas inline in `api/main.py` |
 
 ### Step 13 — Eval harness

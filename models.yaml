@@ -13,9 +13,8 @@ providers:
 
 tasks:
   fact_extraction:
-    primary:  { provider: nvidia_nim,  model: meta/llama-3.1-70b-instruct }
-    fallback: { provider: openrouter,  model: google/gemma-4-31b-it:free }
-
+    primary: { provider: openrouter,  model: google/gemma-4-31b-it:free }
+    fallback:  { provider: nvidia_nim,  model: meta/llama-3.1-70b-instruct }
   question_phrasing:
     primary:  { provider: openrouter,  model: google/gemma-3-12b-it }
 

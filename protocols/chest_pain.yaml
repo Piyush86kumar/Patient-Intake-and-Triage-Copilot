@@ -25,8 +25,6 @@ disposition_rules:
     disposition: PRIMARY_CARE
   - condition: { field: severity, op: "==", value: "moderate" }
     disposition: URGENT_CARE
-  - condition: { field: severity, op: "==", value: "severe" }
-    disposition: EMERGENCY
   - condition: { field: default, op: "==", value: true }
     disposition: URGENT_CARE
 safety_netting: >

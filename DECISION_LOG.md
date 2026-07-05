@@ -27,14 +27,9 @@
 **Why:** Sufficient for a demo with synthetic data. Zero infrastructure, zero config, portable.
 **Production gap:** Concurrent write load requires managed Postgres. Named explicitly in the production-readiness doc.
 
-### In-process CLI/Gradio, not HTTP client-server
-**Decision:** Both `cli/chat.py` and `ui/gradio_app.py` call `process_turn()` directly (same process), not through the FastAPI endpoints.
+### In-process CLI, not HTTP client-server
+**Decision:** `cli/chat.py` calls `process_turn()` directly (same process), not through the FastAPI endpoints.
 **Why:** Fastest possible development loop — no HTTP serialization, no server restart needed for CLI testing. The FastAPI endpoints exist for integration/client use.
-**Trade-off:** The CLI and UI share the same process memory. If the controller crashes, the UI goes down with it.
-
-### Gradio mounted inside FastAPI
-**Decision:** Mount Gradio UI at `/ui` via `gr.mount_gradio_app()` in `api/main.py`.
-**Why:** Single `uvicorn` command serves both REST API and web UI on one port. No separate Gradio process to manage.
 
 ### No fine-tuning or vector DB
 **Decision:** Hand-authored YAML protocols + category-keyed lookup.

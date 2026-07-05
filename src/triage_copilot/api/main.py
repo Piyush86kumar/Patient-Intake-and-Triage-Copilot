@@ -5,16 +5,12 @@ import uuid
 from fastapi import FastAPI, Header, HTTPException, status
 from pydantic import BaseModel
 
-import gradio as gr
-
 from triage_copilot.config import settings
 from triage_copilot.controller.patient_case import PatientCase
 from triage_copilot.controller.state_machine import process_turn
-from ui.gradio_app import demo as gradio_demo
 
 
 app = FastAPI(title="Triage Copilot API")
-app = gr.mount_gradio_app(app, gradio_demo, path="/ui")
 
 
 class MessageRequest(BaseModel):
