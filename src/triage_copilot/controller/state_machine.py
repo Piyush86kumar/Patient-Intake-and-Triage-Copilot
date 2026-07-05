@@ -8,8 +8,9 @@ from triage_copilot.disposition.disposition_engine import decide_disposition
 from triage_copilot.extraction.fact_extractor import extract_facts
 from triage_copilot.extraction.schema import ExtractedFacts
 from triage_copilot.guidance.matcher import match_protocol
-from triage_copilot.questioning.question_selector import next_missing_field
+from triage_copilot.questioning.question_selector import next_missing_field, phrase_question
 from triage_copilot.safety.red_flag_detector import check_red_flags
+from triage_copilot.explanation.explanation_generator import generate_explanation
 
 
 @dataclass
@@ -54,14 +55,6 @@ def escalation_due_to_uncertainty_template():
     )
 
 
-async def phrase_question(field: str, protocol) -> str:
-    return f"Can you tell me about {field}?"
-
-
-async def generate_explanation(disposition_result, facts, protocol) -> str:
-    return f"Based on the information provided, the recommended disposition is {disposition_result.disposition}."
-
-
 async def process_turn(conversation_id: str, message: str) -> ControllerResponse:
     case = PatientCase.load(conversation_id) or PatientCase.new(conversation_id)
     new_facts = await extract_facts(message, case.facts)
@@ -90,6 +83,10 @@ async def process_turn(conversation_id: str, message: str) -> ControllerResponse
         return ControllerResponse(message=question, status=CaseStatus.GATHERING.value)
 
     disposition_result = decide_disposition(case.facts, protocol)
+    if disposition_result.disposition is None:
+        case.status = CaseStatus.EMERGENCY
+        case.save()
+        return escalation_due_to_uncertainty_template()
     explanation = await generate_explanation(disposition_result, case.facts, protocol)
     case.disposition = disposition_result.disposition
     case.status = CaseStatus.DISPOSITION_GIVEN

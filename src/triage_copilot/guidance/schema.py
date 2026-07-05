@@ -9,7 +9,7 @@ class Condition(BaseModel):
     """Recursive condition tree for protocol evaluation."""
 
     field: str | None = None
-    op: Literal["==", "!=", "<", ">", "<=", ">=", "in"] | None = None
+    op: Literal["==", "!=", "<", ">", "<=", ">=", "in", "contains"] | None = None
     value: Any = None
     all: list["Condition"] | None = None
     any: list["Condition"] | None = None
@@ -88,6 +88,8 @@ def evaluate(condition: Condition | dict[str, Any], facts: dict[str, Any]) -> bo
         return actual is not None and expected is not None and actual >= expected
     if condition.op == "in":
         return actual is not None and expected is not None and actual in expected
+    if condition.op == "contains":
+        return actual is not None and expected is not None and expected in actual
 
     raise ValueError(f"Unsupported operator: {condition.op}")
 

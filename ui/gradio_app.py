@@ -37,5 +37,4 @@ with gr.Blocks(title="Patient Intake & Triage Copilot") as demo:
         state_json = gr.JSON()
         refresh_btn.click(get_clinician_view, inputs=[conversation_id_state], outputs=[state_json])
 
-if __name__ == "__main__":
-    demo.launch()
+# demo is imported by api/main.py and mounted via gr.mount_gradio_app

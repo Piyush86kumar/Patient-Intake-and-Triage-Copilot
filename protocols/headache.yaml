@@ -1,6 +1,6 @@
 protocol_id: headache_v1
 symptom_category: headache
-required_fields: [duration_minutes, severity, fever, neck_stiffness, vision_changes]
+required_fields: [duration_minutes, severity]
 red_flags:
   - id: RF-HEADACHE-01
     description: "Headache with fever, neck stiffness, or vision changes"
@@ -8,9 +8,8 @@ red_flags:
       all:
         - { field: severity, op: "==", value: "severe" }
         - { any: [
-              { field: fever, op: ">", value: 102 },
-              { field: neck_stiffness, op: "==", value: true },
-              { field: vision_changes, op: "==", value: true }
+              { field: associated_symptoms, op: "contains", value: "neck_stiffness" },
+              { field: associated_symptoms, op: "contains", value: "vision_changes" }
             ] }
     disposition: EMERGENCY
 disposition_rules:

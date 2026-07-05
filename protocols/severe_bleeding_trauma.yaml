@@ -1,6 +1,6 @@
 protocol_id: severe_bleeding_trauma_v1
 symptom_category: severe_bleeding_trauma
-required_fields: [duration_minutes, severity, bleeding_volume, trauma_history, dizziness]
+required_fields: [duration_minutes, severity]
 red_flags:
   - id: RF-BLEED-01
     description: "Heavy bleeding after trauma with possible shock"
@@ -8,9 +8,8 @@ red_flags:
       all:
         - { field: severity, op: "==", value: "severe" }
         - { any: [
-              { field: bleeding_volume, op: ">", value: 200 },
-              { field: trauma_history, op: "==", value: true },
-              { field: dizziness, op: "==", value: true }
+              { field: associated_symptoms, op: "contains", value: "dizziness" },
+              { field: history_flags, op: "contains", value: "trauma" }
             ] }
     disposition: EMERGENCY
 disposition_rules:

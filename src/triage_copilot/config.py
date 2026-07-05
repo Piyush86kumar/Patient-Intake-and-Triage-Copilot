@@ -146,6 +146,13 @@ def _build_settings() -> Settings:
 settings = _build_settings()
 model_registry = ModelRegistry(settings=settings)
 
+if settings.SYNTHETIC_DATA_ONLY:
+    import logging
+    logging.getLogger(__name__).warning(
+        "SYNTHETIC_DATA_ONLY=true — no real patient data should be used. "
+        "This instance is for development/demo purposes only."
+    )
+
 __all__ = [
     "Settings",
     "ProviderConfig",

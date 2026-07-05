@@ -1,6 +1,6 @@
 protocol_id: shortness_of_breath_v1
 symptom_category: shortness_of_breath
-required_fields: [duration_minutes, severity, chest_pain, wheezing, oxygen_saturation]
+required_fields: [duration_minutes, severity]
 red_flags:
   - id: RF-BREATH-01
     description: "Severe shortness of breath with possible respiratory distress"
@@ -8,9 +8,9 @@ red_flags:
       all:
         - { field: severity, op: "==", value: "severe" }
         - { any: [
-              { field: chest_pain, op: "==", value: true },
-              { field: wheezing, op: "==", value: true },
-              { field: oxygen_saturation, op: "<", value: 90 }
+              { field: associated_symptoms, op: "contains", value: "chest_pain" },
+              { field: associated_symptoms, op: "contains", value: "wheezing" },
+              { field: associated_symptoms, op: "contains", value: "shortness_of_breath" }
             ] }
     disposition: EMERGENCY
 disposition_rules:

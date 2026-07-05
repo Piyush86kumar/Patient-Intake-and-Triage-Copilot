@@ -1,6 +1,6 @@
 protocol_id: abdominal_pain_v1
 symptom_category: abdominal_pain
-required_fields: [duration_minutes, severity, vomiting, fever, bloody_stools]
+required_fields: [duration_minutes, severity]
 red_flags:
   - id: RF-ABDOMEN-01
     description: "Severe abdominal pain with vomiting or blood in stool"
@@ -8,9 +8,8 @@ red_flags:
       all:
         - { field: severity, op: "==", value: "severe" }
         - { any: [
-              { field: vomiting, op: "==", value: true },
-              { field: fever, op: ">", value: 102 },
-              { field: bloody_stools, op: "==", value: true }
+              { field: associated_symptoms, op: "contains", value: "vomiting" },
+              { field: associated_symptoms, op: "contains", value: "bloody_stools" }
             ] }
     disposition: EMERGENCY
 disposition_rules:

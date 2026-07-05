@@ -1,6 +1,6 @@
 protocol_id: chest_pain_v1
 symptom_category: chest_pain
-required_fields: [duration_minutes, severity, shortness_of_breath, sweating, radiating_pain]
+required_fields: [duration_minutes, severity]
 red_flags:
   - id: RF-CARDIAC-01
     description: "Chest pain with cardiac warning signs, short duration"
@@ -8,10 +8,17 @@ red_flags:
       all:
         - { field: duration_minutes, op: "<", value: 60 }
         - { any: [
-              { field: shortness_of_breath, op: "==", value: true },
-              { field: sweating, op: "==", value: true },
-              { field: radiating_pain, op: "==", value: true }
+              { field: associated_symptoms, op: "contains", value: "shortness_of_breath" },
+              { field: associated_symptoms, op: "contains", value: "sweating" },
+              { field: associated_symptoms, op: "contains", value: "radiating_pain" }
             ] }
+    disposition: EMERGENCY
+  - id: RF-CARDIAC-02
+    description: "Chest pain in a patient with known cardiac history"
+    condition:
+      all:
+        - { field: duration_minutes, op: "<", value: 120 }
+        - { field: history_flags, op: "contains", value: "cardiac" }
     disposition: EMERGENCY
 disposition_rules:
   - condition: { field: severity, op: "==", value: "mild" }

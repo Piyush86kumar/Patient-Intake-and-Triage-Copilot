@@ -49,4 +49,20 @@ class ProtocolStore:
 
 protocol_store = ProtocolStore()
 
-__all__ = ["ProtocolStore", "protocol_store"]
+
+def load_protocol(protocol_id_or_path: str) -> Protocol:
+    """Load a protocol by id from the store, or by file path (for backward compat)."""
+    from pathlib import Path
+
+    if Path(protocol_id_or_path).suffix == ".yaml":
+        file_path = Path(protocol_id_or_path)
+        if not file_path.is_absolute():
+            file_path = PROTOCOLS_DIR / file_path.name
+        with file_path.open("r", encoding="utf-8") as handle:
+            payload = yaml.safe_load(handle) or {}
+        return Protocol.model_validate(payload)
+
+    return protocol_store.get_protocol(protocol_id_or_path)
+
+
+__all__ = ["ProtocolStore", "protocol_store", "load_protocol"]

@@ -35,7 +35,8 @@ def _depends_on_missing_fields(condition: Condition, facts: ExtractedFacts) -> b
     if condition.field is None:
         return False
 
-    return condition.field not in facts.model_dump()
+    facts_payload = facts.model_dump()
+    return condition.field not in facts_payload or facts_payload[condition.field] is None
 
 
 def decide_disposition(facts: ExtractedFacts, protocol: Protocol) -> DispositionResult:

@@ -1,6 +1,6 @@
 protocol_id: sore_throat_v1
 symptom_category: sore_throat
-required_fields: [duration_minutes, severity, fever, swollen_glands, difficulty_swallowing]
+required_fields: [duration_minutes, severity]
 red_flags:
   - id: RF-THROAT-01
     description: "Sore throat with difficulty breathing or severe swelling"
@@ -8,9 +8,8 @@ red_flags:
       all:
         - { field: severity, op: "==", value: "severe" }
         - { any: [
-              { field: fever, op: ">", value: 102 },
-              { field: swollen_glands, op: "==", value: true },
-              { field: difficulty_swallowing, op: "==", value: true }
+              { field: associated_symptoms, op: "contains", value: "difficulty_swallowing" },
+              { field: associated_symptoms, op: "contains", value: "swollen_glands" }
             ] }
     disposition: EMERGENCY
 disposition_rules:

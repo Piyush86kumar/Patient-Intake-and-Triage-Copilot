@@ -21,7 +21,7 @@ def build_explanation_prompt(disposition_result, facts: ExtractedFacts, safety_n
         f"Disposition: {disposition_result.disposition}\n"
         f"Facts: {facts_summary}\n"
         f"Safety netting: {safety_netting or ''}\n"
-        "Return a short plain-text explanation."
+        'Return JSON with a single key "content" containing the explanation text.'
     )
 
 

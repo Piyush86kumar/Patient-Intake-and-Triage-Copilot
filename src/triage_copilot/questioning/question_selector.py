@@ -28,7 +28,10 @@ def next_missing_field(facts: ExtractedFacts, protocol: Protocol) -> str | None:
 
 
 async def phrase_question(field: str, protocol: Protocol) -> str:
-    prompt = f"Phrase this as a natural, calm follow-up question: {field}"
+    prompt = (
+        f'Phrase this as a natural, calm follow-up question: {field}\n'
+        'Return JSON with a single key "content" containing the question.'
+    )
     response = await llm_client.complete("question_phrasing", prompt, SimpleTextResponse)
     return response.content
 
