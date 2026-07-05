@@ -1,35 +1,41 @@
-# Production Readiness — If This Were Going to Production
+# Production Readiness
+
+What breaks first at 50K conversations/day, what it costs, and what's missing.
 
 ## Scale
 
-- **Stateless API pods** behind a load balancer. The controller state lives in SQLite per pod — this would need to move to a shared managed Postgres instance for horizontal scaling.
-- **LLM call decoupling.** At production load, the synchronous LLM calls inside `process_turn()` would block the request/response cycle. A queue (SQS/Celery) between the controller and the LLM client would allow async processing with proper timeout/retry.
-- **Connection pooling.** The SQLite connection in `patient_case.py` opens/closes per operation — fine for demo volumes but not for concurrent production traffic.
+**SQLite serializes writes.** At 50K conversations/day, `INSERT ... ON CONFLICT DO UPDATE` per turn locks on every write. Fix: managed Postgres with a connection pool, stateless API pods behind a load balancer.
+
+**LLM calls block the HTTP response.** Each turn makes up to 2 sequential calls (extraction + question or explanation). At 15s per attempt, a turn stalls 30s+ when the primary times out. A work queue decouples the response from LLM I/O — return `202 Accepted` with a polling token, process the turn asynchronously.
 
 ## Cost
 
-- Two LLM calls per turn on average (extraction + one of question-phrasing or explanation).
-- Current `models.yaml` assigns: extraction → NVIDIA NIM (Llama 3.1 70B), question-phrasing → OpenRouter (Gemma 3 12B), explanation → Google AI Studio (Gemini 3.5 Flash).
-- Extraction is the most expensive call (70B param model). If cost is a concern at volume, swap to OpenRouter's free-tier models for extraction and reserve the high-quality model for explanation only.
+Per turn: **2 LLM calls maximum** (extraction always, plus question phrasing or explanation). Typical 3-turn conversation: 6 calls. Emergency: 1 call.
 
-## Safety monitoring
+| Task | Model | Est. price per call |
+|---|---|---|
+| Extraction (primary) | `google/gemma-4-31b-it:free` | $0 (free tier) |
+| Extraction (fallback) | `meta/llama-3.1-70b-instruct` (NVIDIA) | ~$0.001 |
+| Question phrasing | `google/gemma-3-12b-it` (OpenRouter) | ~$0.00004 |
+| Explanation (primary) | `gemini-3.5-flash` (Google AI) | ~$0.00009 |
+| Explanation (fallback) | `claude-3.5-sonnet` (OpenRouter) | ~$0.004 |
 
-- **Red-flag rule fire-rate anomalies.** A sudden drop in EMERGENCY fire rate could indicate a regression in the keyword list or protocol conditions. Route structured logs to a monitoring system with alerting on rate changes.
-- **No-protocol-match replay.** Periodically replay conversations that matched `fallback_no_match` to identify coverage gaps. Expand protocols and trigger keywords accordingly.
-- **Groundedness pass-rate tracking.** The `is_grounded()` check in `explanation_generator.py` is a simple keyword-presence heuristic. In production, a dedicated NLI (natural language inference) model would be more robust. Track the pass rate and alert on drops.
+Best case (all primaries succeed): ~$0.0003/conversation — ~**$450/month** at 50K/day. Worst case (free tier exhausted, all fallbacks fire): ~$0.02/conversation — ~**$30K/month**. The spread is dominated by claude-3.5-sonnet at ~50x gemini-flash for explanation.
 
-## Compliance
+## Latency
 
-- **BAAs** (Business Associate Agreements) required with every model provider touching patient text — NVIDIA, Google, and OpenRouter (which fronts Anthropic, Google, and other models).
-- **PHI encryption in transit and at rest.** TLS for all API endpoints. Database encryption at rest (SQLite itself doesn't support this; managed Postgres with TDE would be the production path).
-- **Audit logging.** Every turn writes a structured JSON event (structlog) with conversation ID, timestamp, facts extracted, red-flag result, matched protocol, disposition, and which provider/model handled each LLM call. This must be stored in an append-only log for audit compliance.
-- **Data retention policy.** Patient text in `ExtractedFacts.raw_text` is stored indefinitely in the current SQLite schema. A production system needs configurable retention (e.g., 30/60/90 day auto-purge with a safe harbor for ongoing cases).
+Fact extraction is the bottleneck — most tokens, runs every turn. Explanation generation is close but only fires on the terminal turn. The two sequential calls are the floor latency. Mitigations: smaller extraction model, cache identical message extractions, pre-generate explanations after disposition.
 
-## Gaps for production (not implemented)
+## Safety Monitoring
 
-- Real auth (OAuth2/JWT) — currently a single API key placeholder
-- Rate limiting per conversation/client
-- Structured error responses with proper HTTP status codes for all LLM failure modes
-- Health check endpoint (`GET /health`) with provider status
-- Database migration tooling (Alembic or similar)
-- Container orchestration readiness (health checks, graceful shutdown, config via env vars not files)
+Two uninstrumented metrics: red-flag fire rate per protocol (a drop means a regression) and `fallback_no_match` rate (each hit is a coverage gap). Both need dashboards with anomaly alerts.
+
+## Compliance Gaps
+
+None of this is built — synthetic data only. Required before real PHI: BAAs with all three providers, TLS everywhere, encryption at rest, audit logging on every access, data retention and deletion policy.
+
+## Next Steps (one week)
+
+1. **Move extraction to a paid model.** The free tier has no SLA and unknown rate limits. A small paid model makes latency and cost predictable.
+2. **Log every LLM call.** Prompt size, response time, token count, retry count per provider. Without this, cost and latency are guesswork.
+3. **Add a circuit breaker to the LLM client.** Stop calling a provider after sustained 429s/500s instead of burning retries on every request.
