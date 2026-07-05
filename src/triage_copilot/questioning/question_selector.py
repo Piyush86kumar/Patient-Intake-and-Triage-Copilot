@@ -1,7 +1,18 @@
 from __future__ import annotations
 
+from pydantic import BaseModel
+
+from triage_copilot.config import model_registry
 from triage_copilot.extraction.schema import ExtractedFacts
 from triage_copilot.guidance.schema import Protocol
+from triage_copilot.llm.client import LLMClient
+
+
+class SimpleTextResponse(BaseModel):
+    content: str
+
+
+llm_client = LLMClient(model_registry)
 
 
 def next_missing_field(facts: ExtractedFacts, protocol: Protocol) -> str | None:
@@ -16,4 +27,10 @@ def next_missing_field(facts: ExtractedFacts, protocol: Protocol) -> str | None:
     return None
 
 
-__all__ = ["next_missing_field"]
+async def phrase_question(field: str, protocol: Protocol) -> str:
+    prompt = f"Phrase this as a natural, calm follow-up question: {field}"
+    response = await llm_client.complete("question_phrasing", prompt, SimpleTextResponse)
+    return response.content
+
+
+__all__ = ["SimpleTextResponse", "next_missing_field", "phrase_question"]
