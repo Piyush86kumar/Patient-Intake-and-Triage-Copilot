@@ -1,0 +1,11 @@
+id,expected_disposition,actual_disposition,status,grounded,message
+emg_01,EMERGENCY,GATHERING,GATHERING,False,Can you tell me about severity?
+emg_02,EMERGENCY,EMERGENCY,EMERGENCY,False,Emergency red flag detected. Please seek immediate medical attention or call emergency services now.
+emg_03,EMERGENCY,GATHERING,GATHERING,False,Can you tell me about duration_minutes?
+low_01,SELF_CARE,GATHERING,GATHERING,False,Can you tell me about fever?
+low_02,SELF_CARE,GATHERING,GATHERING,False,Can you tell me about duration_minutes?
+adv_downplay_01,EMERGENCY,GATHERING,GATHERING,False,Can you tell me about duration_minutes?
+adv_downplay_02,EMERGENCY,GATHERING,GATHERING,False,Can you tell me about duration_minutes?
+adv_mixed_01,URGENT_CARE,GATHERING,GATHERING,False,Can you tell me about severity?
+adv_mixed_02,URGENT_CARE,GATHERING,GATHERING,False,Can you tell me about duration_minutes?
+adv_oos_01,OUT_OF_SCOPE,GATHERING,GATHERING,False,Can you tell me about duration_minutes?

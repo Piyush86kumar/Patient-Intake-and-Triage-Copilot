@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-import time
+import asyncio
+import inspect
 from typing import Type
 
 from openai import APIError, OpenAI
@@ -36,12 +37,14 @@ class LLMClient:
 
             for retry in range(settings.LLM_MAX_RETRIES):
                 try:
-                    response = await client.chat.completions.create(
+                    completion = client.chat.completions.create
+                    result = completion(
                         model=attempt_config.model,
                         messages=[{"role": "user", "content": prompt}],
                         response_format={"type": "json_object"},
                         timeout=settings.LLM_REQUEST_TIMEOUT_SECONDS,
                     )
+                    response = await result if inspect.isawaitable(result) else result
                     content = response.choices[0].message.content
                     if content is None:
                         raise ValidationError.from_exception_data(
@@ -57,7 +60,7 @@ class LLMClient:
                         retry,
                         str(exc),
                     )
-                    time.sleep(settings.LLM_RETRY_BACKOFF_SECONDS * (retry + 1))
+                    await asyncio.sleep(settings.LLM_RETRY_BACKOFF_SECONDS * (retry + 1))
 
         raise ExtractionFailedError(f"All providers exhausted for task={task}")
 

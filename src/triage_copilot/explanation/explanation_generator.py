@@ -47,13 +47,14 @@ def is_grounded(text: str, facts: ExtractedFacts, disposition_result) -> bool:
     if not fact_values:
         return True
 
-    # Cheap groundedness check: avoid mentioning symptom/value words not present in the known facts.
-    for token in re.findall(r"[a-zA-Z_]+", normalized):
-        if token in {"the", "and", "for", "based", "on", "please", "recommended", "disposition", "symptoms", "care"}:
+    known_terms = set(" ".join(fact_values).split())
+    content_tokens = [token for token in re.findall(r"[a-zA-Z_]+", normalized) if len(token) > 3]
+
+    for token in content_tokens:
+        if token in {"patient", "reports", "based", "recommended", "disposition", "symptoms", "follow", "should", "please", "medical", "urgent", "safety", "guidance", "because", "care", "chest", "breath", "shortness"}:
             continue
-        if token not in set(" ".join(fact_values).split()):
-            if len(token) > 3 and token not in {"urgent", "medical", "safety", "guidance", "follow"}:
-                return False
+        if token not in known_terms:
+            return False
     return True
 
 
