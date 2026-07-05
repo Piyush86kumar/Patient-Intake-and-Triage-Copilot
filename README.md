@@ -65,8 +65,14 @@ The eval suite runs each JSONL case through the full conversation loop, records 
 
 All patient data is synthetic. The `SYNTHETIC_DATA_ONLY=true` flag is the default in `.env.example` and enforced by a startup warning. No real PHI should ever enter this system. The red-flag detector is entirely deterministic — keyword matching plus protocol conditions, zero LLM calls — and runs on every turn before any other branch.
 
-## Other Docs
+## Deliverables
 
-- [ARCHITECTURE.md](ARCHITECTURE.md)
-- [DECISION_LOG.md](DECISION_LOG.md)
-- [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md)
+| # | Deliverable | Where to find it |
+|---|---|---|
+| 1 | Code | This repository |
+| 2 | README | This file |
+| 3 | Architecture writeup | [ARCHITECTURE.md](ARCHITECTURE.md) |
+| 4 | Decision log | [DECISION_LOG.md](DECISION_LOG.md) |
+| 5 | Evaluation | [EVALUATION.md](EVALUATION.md) |
+| 6 | Production readiness | [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) |
+| 7 | AI-tooling note | [AI_TOOLING_NOTES.md](AI_TOOLING_NOTES.md) |
