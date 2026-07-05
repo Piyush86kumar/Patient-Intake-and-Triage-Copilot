@@ -68,6 +68,9 @@ def evaluate(condition: Condition | dict[str, Any], facts: dict[str, Any]) -> bo
     if condition.any is not None:
         return any(evaluate(child, facts) for child in condition.any)
 
+    if condition.field == "default":
+        return True
+
     assert condition.field is not None
     assert condition.op is not None
 

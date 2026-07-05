@@ -35,17 +35,25 @@ _HISTORY_FLAG_MAP = [
     ("stroke", ["stroke"]),
     ("afib_arrhythmia", ["afib", "arrhythmia", "pacemaker"]),
     ("cardiac_intervention", ["stent", "bypass", "angina"]),
+    ("trauma", ["accident", "trauma", "broken", "fracture", "injury", "bleeding", "fell"]),
 ]
 
 
+_DURATION_CLEANUP_RE = re.compile(r'(\d+)[oOlL](\s*(?:min|mins|minutes|hour|hours|hr|hrs|day|days)\b)', re.IGNORECASE)
+_DURATION_CLEANUP_SUB = r'\g<1>0\2'
+
+
 def _parse_duration(text: str) -> int | None:
-    m = re.search(r"(\d+)\s*(min|mins|minutes|hour|hours|hr|hrs)", text, re.IGNORECASE)
+    text = _DURATION_CLEANUP_RE.sub(_DURATION_CLEANUP_SUB, text)
+    m = re.search(r"(\d+)\s*(min|mins|minutes|hour|hours|hr|hrs|day|days)", text, re.IGNORECASE)
     if not m:
         return None
     value = int(m.group(1))
     unit = m.group(2).lower()
     if unit in ("hour", "hours", "hr", "hrs"):
         value *= 60
+    elif unit in ("day", "days"):
+        value *= 1440
     return value
 
 
@@ -67,7 +75,7 @@ def _parse_history(text: str) -> list[str]:
 
 
 _SYMPTOM_KEYWORDS: list[tuple[list[str], str]] = [
-    (["shortness", "breath", "breathing", "dyspnea"], "shortness_of_breath"),
+    (["shortness", "breath", "breathing", "breathlessness", "dyspnea"], "shortness_of_breath"),
     (["sweat", "perspire", "diaphoretic"], "sweating"),
     (["arm", "jaw", "shoulder", "back pain"], "radiating_pain"),
     (["chest", "tight", "pressure"], "chest_pain"),
@@ -79,6 +87,9 @@ _SYMPTOM_KEYWORDS: list[tuple[list[str], str]] = [
     (["swollen gland", "swollen lymph", "lump in neck"], "swollen_glands"),
     (["neck stiff", "stiff neck"], "neck_stiffness"),
     (["vision", "blurr", "double vision", "seeing"], "vision_changes"),
+    (["fever", "high temperature", "feverish"], "fever"),
+    (["cough", "coughing"], "cough"),
+    (["cold", "runny nose", "congestion"], "cold"),
 ]
 
 
@@ -91,9 +102,26 @@ def _parse_associated_symptoms(text: str) -> list[str]:
     return found
 
 
+_CATEGORY_PATTERNS: list[tuple[list[str], str]] = [
+    (["headache", "migraine", "head pain"], "headache"),
+    (["chest", "tight", "pressure", "heart pain", "stabbing"], "chest_pain"),
+    (["bleeding", "blood", "gushing", "wound", "fracture", "broken", "trauma", "accident", "injury", "fell"], "severe_bleeding_trauma"),
+    (["shortness of breath", "breathlessness", "can't breathe", "cannot breathe", "difficulty breathing", "hard to breathe", "trouble breathing", "dyspnea"], "shortness_of_breath"),
+    (["sore throat", "throat pain", "difficulty swallowing", "swollen throat"], "sore_throat"),
+    (["abdominal", "stomach", "belly", "abdomen"], "abdominal_pain"),
+]
+
+
+def _infer_symptom_category(lower: str) -> str:
+    for keywords, category in _CATEGORY_PATTERNS:
+        if any(kw in lower for kw in keywords):
+            return category
+    return "general"
+
+
 def _heuristic_fallback(raw_text: str, prior_facts: ExtractedFacts | None = None) -> ExtractedFacts:
     lower = raw_text.lower()
-    category = "chest_pain" if any(token in lower for token in ["chest", "pain", "shortness", "breath", "tight"]) else "general"
+    category = _infer_symptom_category(lower)
     associated_symptoms = _parse_associated_symptoms(raw_text)
 
     if prior_facts is not None:

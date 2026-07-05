@@ -32,7 +32,7 @@ def _depends_on_missing_fields(condition: Condition, facts: ExtractedFacts) -> b
     if condition.any is not None:
         return any(_depends_on_missing_fields(child, facts) for child in condition.any)
 
-    if condition.field is None:
+    if condition.field is None or condition.field == "default":
         return False
 
     facts_payload = facts.model_dump()
