@@ -5,3 +5,5 @@ __pycache__/
 .env
 eval/results/*.json
 STATUS_UPDATE.md
+MASTER_AUDIT_PROMPT.md
+BUILD_GUIDE (1).md
