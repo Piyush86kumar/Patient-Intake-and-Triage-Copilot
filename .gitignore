@@ -3,7 +3,9 @@ __pycache__/
 *.pyc
 *.db
 .env
-eval/results/*.json
+/.pytest_cache/
+/eval/results/*.json
+/eval/results/*.csv
 STATUS_UPDATE.md
 MASTER_AUDIT_PROMPT.md
 BUILD_GUIDE (1).md

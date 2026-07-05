@@ -1,106 +1,54 @@
 # Triage Copilot — Architecture
 
-## Overview
+A patient describes symptoms in free text; the system extracts structured facts, checks for emergencies via pure-Python rules, matches a triage protocol, asks targeted follow-up questions, then recommends a care level (self-care, primary care, urgent care, emergency). This is care navigation, not diagnosis — it routes rather than diagnoses. A single LLM call can't do this: extraction, safety, protocol matching, and disposition each require different logic, and multiple turns may be needed before enough information exists.
 
-A modular triage assistant for patient symptom intake. The system combines deterministic, schema-driven triage logic (protocols, red-flag detection, disposition rules) with LLM-assisted fact extraction, question phrasing, and explanation generation.
-
-```
-Patient message
-      │
-      ▼
-┌─────────────────────────────┐
-│  CONVERSATION CONTROLLER     │  state machine, owns PatientCase (SQLite)
-│  (controller/state_machine)  │  enforces red-flag check on EVERY turn,
-└──────────────┬───────────────┘  unconditionally, before any other branch
-               │ 1. raw text
-               ▼
-     ┌────────────────────┐
-     │  FACT EXTRACTOR      │  LLM call → task: fact_extraction
-     │  (extraction/)       │  primary: NVIDIA NIM · fallback: OpenRouter
-     └─────────┬─────────────┘  schema-validated (ExtractedFacts) before use
-               │ 2. structured facts
-               ▼
-     ┌─────────────────────────────┐
-     │  RED-FLAG DETECTOR            │  pure Python, zero I/O, runs every turn
-     │  (safety/)                    │  Layer 1: raw-text trigger keywords
-     │                                │  Layer 2: structured protocol red_flags
-     └─────────┬──────────────────────┘
-     fired? ──Yes──► EMERGENCY — fixed template response, zero extra LLM calls
-               │ No
-               ▼
-     ┌────────────────────────┐
-     │  GUIDANCE MATCHER        │  in-memory YAML lookup, no I/O
-     │  (guidance/)              │  falls back to fallback_no_match protocol
-     └─────────┬──────────────────┘
-               │ 3. matched protocol
-               ▼
-     ┌────────────────────────┐
-     │  QUESTION SELECTOR       │  checklist-driven — finds next missing field
-     │  (questioning/)           │  LLM phrases it → task: question_phrasing
-     └─────────┬──────────────────┘  primary: OpenRouter (small/cheap model)
-               │ Not enough info → loop
-               │ Enough info, or question budget exhausted
-               ▼
-     ┌────────────────────────┐
-     │  DISPOSITION ENGINE       │  pure Python, ordered rule evaluation,
-     │  (disposition/)            │  most-severe-first, bias toward caution
-     └─────────┬──────────────────┘
-               │ 4. disposition + cited rule ID
-               ▼
-     ┌────────────────────────────┐
-     │  EXPLANATION GENERATOR       │  LLM call → task: explanation_generation
-     │  (explanation/)                │  primary: Google AI Studio (Gemini)
-     │                                 │  fallback: OpenRouter
-     └─────────┬────────────────────────┘  groundedness-checked before returning
-               │ 5. patient-facing message
-               ▼
-         Patient receives reply
+```mermaid
+flowchart TD
+    A["Patient message"] --> B["Out-of-scope filter"]
+    B -- out of scope --> C["OOS response"]
+    B -- in scope --> D["Extract facts"]
+    D --> E["Merge with prior facts"]
+    E --> F["Red-flag: keywords only"]
+    F -- fired --> G["EMERGENCY"]
+    F -- not fired --> H{"Turn limit reached?"}
+    H -- yes --> I["Escalation response"]
+    H -- no --> J["Match protocol"]
+    J --> K["Red-flag: protocol conditions"]
+    K -- fired --> G
+    K -- not fired --> L{"Missing required field?"}
+    L -- yes --> M["LLM phrase question"]
+    M --> N["+1 turn count, save state"]
+    N --> A
+    L -- no --> O["Decide disposition"]
+    O -- None --> I
+    O -- disposition --> P["Generate explanation"]
+    P --> Q["DISPOSITION_GIVEN response"]
 ```
 
-## Key architectural guarantee
+The red-flag check runs twice per turn — keyword layer before protocol matching and protocol-condition layer after — so emergency detection does not depend on having chosen the correct protocol.
 
-The Red-Flag Detector (`safety/red_flag_detector.py`) sits between Fact Extraction and Guidance Matching in the control flow, and runs unconditionally on every turn — never skipped, never model-decided. This is enforced in `controller/state_machine.py:process_turn()`: `check_red_flags()` is called at line 70, before `match_protocol()` at line 81.
+## Components
 
-## Core modules (src/triage_copilot/)
+**Fact extraction** (`extraction/fact_extractor.py`) takes the patient's free-text message together with any previously extracted facts, builds a structured prompt, and calls an LLM to produce an `ExtractedFacts` object containing symptom category, severity, duration in minutes, a list of associated symptoms, explicit negatives, and history flags. The extraction prompt includes the full field schema and prior facts so the LLM sees the conversation context. When the LLM call fails — due to timeout, API error, or invalid JSON — a heuristic fallback takes over. The fallback uses regex to extract duration (with typo tolerance: `3o mins` normalizes to `30 mins`), a keyword map for severity (mapping 12+ severity descriptors to mild/moderate/severe), a history-flag map that recognizes 7 condition categories from keywords (cardiac history, hypertension, diabetes, stroke, afib/arrhythmia, prior cardiac intervention, trauma), and symptom-category patterns for all 6 supported protocols plus `general` as a catch-all. Every fallback path produces the same `ExtractedFacts` shape as the LLM path, so no downstream component needs to know which extraction path was taken.
 
-| Module | Files | Role |
-|--------|-------|------|
-| `api/` | `main.py` | FastAPI endpoints: `POST /conversations`, `POST /conversations/{id}/messages`, `GET /conversations/{id}/state`. Gradio UI mounted at `/ui`. |
-| `controller/` | `patient_case.py`, `state_machine.py` | `PatientCase` SQLite persistence; `process_turn()` — the orchestration core. |
-| `disposition/` | `disposition_engine.py` | `decide_disposition()` — deterministic, ordered rule evaluation; returns `None` if required fields missing. |
-| `explanation/` | `explanation_generator.py` | `generate_explanation()` — LLM call with `is_grounded()` check and fallback template. |
-| `extraction/` | `fact_extractor.py`, `prompts.py`, `schema.py` | `extract_facts()` — LLM call to parse free text into `ExtractedFacts`; heuristic fallback on LLM failure. |
-| `guidance/` | `schema.py`, `protocol_store.py`, `matcher.py` | `Protocol` model, YAML loading/validation at startup, `match_protocol()` with fallback. |
-| `llm/` | `client.py` | `LLMClient.complete()` — retry-then-fallback across primary/fallback providers per `models.yaml`. |
-| `logging/` | `__init__.py` | structlog-style helper. |
-| `questioning/` | `question_selector.py` | `next_missing_field()` — returns first missing required field; `phrase_question()` — LLM call for natural-language follow-up. |
-| `safety/` | `red_flag_detector.py`, `trigger_keywords.py` | `check_red_flags()` — raw-text keyword scan + protocol condition evaluation. Zero LLM calls. |
+**Red-flag detector** (`safety/red_flag_detector.py`) is pure Python with zero I/O or LLM calls — the safety layer must never depend on an external service. It runs two detection layers in sequence. The first layer scans the raw patient text against 60+ emergency trigger keywords ranging from obvious ("gunshot", "cannot breathe", "heart attack") to phrasing variants ("broken bone", "broken leg", "fracture", "breathlessness", "can't catch breath", "asthma attack", "having a stroke"). If any keyword matches, detection short-circuits immediately and returns an emergency disposition without consulting the protocol layer, which ensures that the detector cannot miss an emergency due to a protocol-matching failure. The second layer evaluates each red-flag condition defined in the matched protocol. These conditions support `all`/`any` logical composition across multiple facts and use field operators (`==`, `!=`, `<`, `>`, `in`, `contains`) evaluated against the extracted facts dictionary. For example, RF-CARDIAC-01 in the chest pain protocol fires when duration is under 60 minutes AND at least one of shortness_of_breath, sweating, or radiating pain is present in the associated symptoms list.
 
-## Interfaces
+**Protocol matcher** (`guidance/matcher.py`) selects one of 7 YAML-defined protocols by comparing the extracted `symptom_category` against each protocol's `symptom_category` field. It attempts an exact match first, then a keyword-token overlap score (tokenizing both the extracted and protocol category on underscore/space boundaries and counting intersection size), and falls back to a catch-all `fallback_no_match` protocol when no candidate scores above zero. Each protocol is a flat YAML file in the `protocols/` directory listing its red-flag rules, required fields, disposition rules (each with a condition and a target care level), and safety-netting text. Adding a new protocol requires only a new YAML file — no Python changes.
 
-- **CLI** (`cli/chat.py`): calls `process_turn()` directly (in-process) for fast manual testing.
-- **FastAPI** (`api/main.py`): serves REST API.
+**Question selector** (`questioning/question_selector.py`) finds the first required field from the matched protocol that does not yet have a non-null value in the extracted facts, then delegates to an LLM to phrase a natural-language question for that specific field. It asks exactly one question per turn rather than running an exhaustive intake script, so the conversation adapts to what is already known.
 
-## Data flow
+**Disposition engine** (`disposition/disposition_engine.py`) evaluates the matched protocol's `disposition_rules` in order and returns the first rule whose condition evaluates to true. Before evaluating each rule, it checks whether the rule's condition depends on any fact that is still missing — if so, the rule is skipped rather than evaluated with a null value. This means mild rules that depend only on severity get evaluated early, while moderate rules that also depend on duration are deferred until duration is collected. When no rule matches (all conditions false or deferred due to missing fields), the engine returns `None`, and the controller escalates to an uncertainty-driven emergency response.
 
-1. Patient sends free-text message
-2. `extract_facts()` (LLM) → structured `ExtractedFacts`
-3. `check_red_flags()` (deterministic) → EMERGENCY or continue
-4. `match_protocol()` (YAML lookup) → best protocol or fallback
-5. `next_missing_field()` (checklist) → ask question or proceed
-6. `decide_disposition()` (rule engine) → disposition
-7. `generate_explanation()` (LLM + groundedness check) → patient-facing message
+**Explanation generator** (`explanation/explanation_generator.py`) builds a prompt from the disposition result, a JSON representation of the extracted facts, and the protocol's safety-netting text, then calls an LLM to produce a human-readable explanation. After the LLM responds, the generator runs `is_grounded()` — a token-allowlist check that rejects explanations containing symptom-describing tokens not present in the extracted facts — and falls back to a deterministic template with the protocol's safety-netting text if the LLM introduced unsupported content. Groundedness is enforced by code, not by prompting alone.
 
-Each step writes a structured JSON event (structlog) keyed by conversation ID.
+## Model Choice
 
-## Protocols
+From `models.yaml`: fact extraction uses `google/gemma-4-31b-it:free` (OpenRouter, primary) with `meta/llama-3.1-70b-instruct` (NVIDIA NIM, fallback) — the free tier keeps development cost near zero while the fallback provides reliable coverage under rate limits. Question phrasing uses `google/gemma-3-12b-it` (OpenRouter with no fallback) because the task of rephrasing a field name as a conversational question is small enough that a compact model is sufficient. Explanation generation uses `gemini-3.5-flash` (Google AI Studio, primary) with `anthropic/claude-3.5-sonnet` (OpenRouter, fallback) — flash offers fast, low-cost generation and claude serves as a dependable backup.
 
-Seven YAML protocols under `protocols/` define symptom categories, required fields, red-flag conditions, disposition rules, and safety-netting text. All conditions use a safe recursive `{field, op, value}` / `{all, any}` structure — no `eval()`.
+## Safety Guarantee
 
-## Persistence
+The red-flag check runs unconditionally on every turn before any other branching logic — a keyword-only pass before protocol matching and a protocol-condition pass after — so no code path can produce a non-emergency response without passing through the detector. The test suite at `tests/unit/test_red_flag_detector.py` verifies this invariant: one test confirms that the keyword layer fires ahead of protocol conditions even when the protocol would have no match, and another test confirms that protocol conditions still fire when no keyword matches but structured facts satisfy a red-flag rule.
 
-Single-table SQLite via `PatientCase` in `controller/patient_case.py`. One `patient_cases` table storing conversation state as serialized JSON.
+## Trade-Off
 
-## Deployment
-
-Single process: `uvicorn triage_copilot.api.main:app --host 0.0.0.0 --port 8000` serves API + UI on one port. Dockerfile provided for containerized deployment.
+The protocol matcher selects by exact category match then token-overlap scoring across all loaded protocols — an O(n) linear scan that works for the current 7 protocols but will not scale past approximately 15-20 without a dedicated retrieval layer (embedding-based or inverted index). The YAML-as-code convention keeps protocol authorship accessible to non-developers and makes version control of triage logic straightforward, but if the protocol set grows significantly, the matching strategy must be replaced before the scoring ambiguity reaches a critical threshold.

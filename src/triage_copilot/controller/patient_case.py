@@ -9,7 +9,7 @@ from triage_copilot.config import BASE_DIR
 from triage_copilot.extraction.schema import ExtractedFacts
 
 
-DB_PATH = BASE_DIR.parent / "data" / "patient_cases.db"
+DB_PATH = BASE_DIR / "data" / "patient_cases.db"
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
