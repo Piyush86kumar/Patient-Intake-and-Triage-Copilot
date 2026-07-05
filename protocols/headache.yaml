@@ -1,0 +1,23 @@
+protocol_id: headache_v1
+symptom_category: headache
+required_fields: [duration_minutes, severity, fever, neck_stiffness, vision_changes]
+red_flags:
+  - id: RF-HEADACHE-01
+    description: "Headache with fever, neck stiffness, or vision changes"
+    condition:
+      all:
+        - { field: severity, op: "==", value: "severe" }
+        - { any: [
+              { field: fever, op: ">", value: 102 },
+              { field: neck_stiffness, op: "==", value: true },
+              { field: vision_changes, op: "==", value: true }
+            ] }
+    disposition: EMERGENCY
+disposition_rules:
+  - condition: { field: severity, op: "==", value: "mild" }
+    disposition: PRIMARY_CARE
+  - condition: { field: default, op: "==", value: true }
+    disposition: URGENT_CARE
+safety_netting: >
+  Seek medical evaluation promptly if headache is sudden and severe, if you have confusion,
+  or if symptoms are worsening despite rest.

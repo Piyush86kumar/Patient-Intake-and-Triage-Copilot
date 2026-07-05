@@ -1,0 +1,10 @@
+protocol_id: fallback_no_match_v1
+symptom_category: fallback_no_match
+required_fields: [duration_minutes, severity]
+red_flags: []
+disposition_rules:
+  - condition: { field: default, op: "==", value: true }
+    disposition: URGENT_CARE
+safety_netting: >
+  We could not fully categorize these symptoms, so we are erring toward caution and recommend
+  seeking urgent care if symptoms are worsening or if you have any concerning new signs.

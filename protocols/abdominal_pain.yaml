@@ -1,0 +1,23 @@
+protocol_id: abdominal_pain_v1
+symptom_category: abdominal_pain
+required_fields: [duration_minutes, severity, vomiting, fever, bloody_stools]
+red_flags:
+  - id: RF-ABDOMEN-01
+    description: "Severe abdominal pain with vomiting or blood in stool"
+    condition:
+      all:
+        - { field: severity, op: "==", value: "severe" }
+        - { any: [
+              { field: vomiting, op: "==", value: true },
+              { field: fever, op: ">", value: 102 },
+              { field: bloody_stools, op: "==", value: true }
+            ] }
+    disposition: EMERGENCY
+disposition_rules:
+  - condition: { field: severity, op: "==", value: "mild" }
+    disposition: PRIMARY_CARE
+  - condition: { field: default, op: "==", value: true }
+    disposition: URGENT_CARE
+safety_netting: >
+  Seek urgent care if pain becomes constant, you cannot keep fluids down, or you notice blood in
+  vomit or stool.

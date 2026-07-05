@@ -1,0 +1,23 @@
+protocol_id: severe_bleeding_trauma_v1
+symptom_category: severe_bleeding_trauma
+required_fields: [duration_minutes, severity, bleeding_volume, trauma_history, dizziness]
+red_flags:
+  - id: RF-BLEED-01
+    description: "Heavy bleeding after trauma with possible shock"
+    condition:
+      all:
+        - { field: severity, op: "==", value: "severe" }
+        - { any: [
+              { field: bleeding_volume, op: ">", value: 200 },
+              { field: trauma_history, op: "==", value: true },
+              { field: dizziness, op: "==", value: true }
+            ] }
+    disposition: EMERGENCY
+disposition_rules:
+  - condition: { field: severity, op: "==", value: "mild" }
+    disposition: PRIMARY_CARE
+  - condition: { field: default, op: "==", value: true }
+    disposition: URGENT_CARE
+safety_netting: >
+  Apply direct pressure to the bleeding area if safe to do so, call emergency services if bleeding is
+  heavy or does not slow, and seek immediate care for fainting or severe weakness.

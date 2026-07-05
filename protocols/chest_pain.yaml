@@ -1,0 +1,23 @@
+protocol_id: chest_pain_v1
+symptom_category: chest_pain
+required_fields: [duration_minutes, severity, shortness_of_breath, sweating, radiating_pain]
+red_flags:
+  - id: RF-CARDIAC-01
+    description: "Chest pain with cardiac warning signs, short duration"
+    condition:
+      all:
+        - { field: duration_minutes, op: "<", value: 60 }
+        - { any: [
+              { field: shortness_of_breath, op: "==", value: true },
+              { field: sweating, op: "==", value: true },
+              { field: radiating_pain, op: "==", value: true }
+            ] }
+    disposition: EMERGENCY
+disposition_rules:
+  - condition: { field: severity, op: "==", value: "mild" }
+    disposition: PRIMARY_CARE
+  - condition: { field: default, op: "==", value: true }
+    disposition: URGENT_CARE
+safety_netting: >
+  Seek emergency care immediately if pain worsens, spreads to your arm or jaw,
+  or you develop shortness of breath or sweating.
